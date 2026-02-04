@@ -3,7 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cuestionario Interactivo - Repaso de Leyes Españolas</title>
+    <title>LPM</title>
+    
+    <link rel="manifest" href="manifest.json">    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="LPM">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="logo.png">    
+    <meta name="theme-color" content="#1a202c">
+
     <!-- Carga de Tailwind CSS para el styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -2482,13 +2490,13 @@
         function loadQuestion() {
             if (State.quizCompleted) return;
 
-            State.attemptsOnCurrentQuestion = 0; 
+            State.attemptsOnCurrentQuestion = 0;
             centralFeedbackOverlay.style.display = 'none';
-            
+
             const totalQuestions = State.activeQuizData.length;
-            
-            // Actualizar UI según modo (Switch limpio)
-            switch(State.mode) {
+
+            // Actualizar UI
+            switch (State.mode) {
                 case MODES.ADVENTURE:
                     progressBar.style.width = '100%';
                     progressBar.className = 'h-full transition-all duration-300 bg-teal-500';
@@ -2511,21 +2519,94 @@
                     questionCountDisplay.textContent = `Pregunta ${State.currentQuestionIndex + 1} de ${totalQuestions}`;
                     challengeFailureCounter.classList.add('hidden');
                     break;
-                default: // Normal & Review
+                default:
                     progressBar.style.width = `${(State.currentQuestionIndex / totalQuestions) * 100}%`;
                     progressBar.className = 'h-full transition-all duration-300 bg-green-500';
-                    questionCountDisplay.textContent = State.mode === MODES.REVIEW ? 
-                        `Repaso: ${State.currentQuestionIndex + 1}/${totalQuestions}` : 
+                    questionCountDisplay.textContent = State.mode === MODES.REVIEW ?
+                        `Repaso: ${State.currentQuestionIndex + 1}/${totalQuestions}` :
                         `Pregunta ${State.currentQuestionIndex + 1}/${totalQuestions}`;
                     challengeFailureCounter.classList.add('hidden');
             }
-            
+
             const currentQ = State.activeQuizData[State.currentQuestionIndex];
-            questionText.textContent = currentQ.question;
+
+            // --- RENDERIZADO DE PREGUNTA Y COPIADO ROBUSTO ---
+            questionText.innerHTML = '';
+
+            const textSpan = document.createElement('span');
+            textSpan.textContent = currentQ.question;
+            questionText.appendChild(textSpan);
+
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'ml-3 inline-flex items-center justify-center p-1 rounded hover:bg-gray-600 text-gray-400 hover:text-white transition-colors duration-200 align-middle';
+            copyBtn.title = "Copiar enunciado";
+            copyBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>`;
+
+            // Lógica Híbrida (Moderno + Fallback Legacy)
+            copyBtn.onclick = async (e) => {
+                e.stopPropagation();
+                const textToCopy = currentQ.question;
+                let success = false;
+
+                // 1. Intento Moderno (Async Clipboard API)
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    try {
+                        await navigator.clipboard.writeText(textToCopy);
+                        success = true;
+                    } catch (err) {
+                        console.warn('Clipboard API falló (posible contexto inseguro), intentando fallback...');
+                    }
+                }
+
+                // 2. Fallback Legacy (execCommand para file:// o http://)
+                if (!success) {
+                    try {
+                        const textArea = document.createElement("textarea");
+                        textArea.value = textToCopy;
+                        
+                        // Asegurar que el textarea no sea visible ni desplace la pantalla
+                        textArea.style.position = "fixed";
+                        textArea.style.left = "-9999px";
+                        textArea.style.top = "0";
+                        
+                        document.body.appendChild(textArea);
+                        textArea.focus();
+                        textArea.select();
+                        
+                        success = document.execCommand('copy');
+                        document.body.removeChild(textArea);
+                    } catch (err) {
+                        console.error('Fallback copy falló:', err);
+                    }
+                }
+
+                // 3. Feedback Visual
+                const originalHTML = copyBtn.innerHTML;
+                if (success) {
+                    copyBtn.innerHTML = '<span class="text-green-400 font-bold text-sm">✓</span>';
+                    copyBtn.classList.add('bg-gray-700');
+                } else {
+                    copyBtn.innerHTML = '<span class="text-red-500 font-bold text-sm">✕</span>';
+                    // En iOS a veces se requiere un alert si todo falla por permisos estrictos
+                    // alert("No se pudo copiar automáticamente. Por favor selecciona el texto manualmente."); 
+                }
+
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalHTML;
+                    copyBtn.classList.remove('bg-gray-700');
+                }, 1200);
+            };
+
+            questionText.appendChild(copyBtn);
+            // --- FIN COPIADO ---
+
             optionsContainer.innerHTML = '';
-            
-            const shuffledOptions = shuffleArray(currentQ.options); 
-            
+            const shuffledOptions = shuffleArray(currentQ.options);
+
             shuffledOptions.forEach((optionText) => {
                 const button = document.createElement('button');
                 button.textContent = optionText;
@@ -2542,9 +2623,9 @@
                 skipButton.onclick = () => handleSkipQuestion();
                 optionsContainer.appendChild(skipButton);
             }
-            
-            optionsContainer.scrollTop = 0;    
-            saveStateToStorage();        
+
+            optionsContainer.scrollTop = 0;
+            saveStateToStorage();
         }
 
         function showCorrectFeedback() {
