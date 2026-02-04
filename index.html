@@ -768,7 +768,6 @@
 //####################################################
 
 
-
 'Tema-01-test-02-x':{
  title:"IV-Convenio-02-x",
  data:[
@@ -2106,6 +2105,50 @@
             return newArray;
         }
 
+        // --- GESTIÓN DE LOCALSTORAGE ---
+
+        function saveStateToStorage() {
+            if (!State.activeQuizId || State.quizCompleted) return;
+            
+            // Clonamos y limpiamos basura no serializable (timeouts)
+            const stateClone = { ...State };
+            delete stateClone.timeoutId; 
+            
+            try {
+                localStorage.setItem('quiz_app_state', JSON.stringify(stateClone));
+            } catch (e) {
+                console.error("Storage Full/Error", e);
+            }
+        }
+
+        function clearStorage() {
+            localStorage.removeItem('quiz_app_state');
+        }
+
+        function attemptRestoreSession() {
+            const saved = localStorage.getItem('quiz_app_state');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    Object.assign(State, parsed); // Hidratación
+                    
+                    // Reconstrucción de UI
+                    showScreen('quiz-game'); 
+                    loadQuestion(); 
+                    return true;
+                } catch (e) {
+                    clearStorage();
+                }
+            }
+            return false;
+        }
+
+
+
+
+
+
+
         // Fix Crítico: Reset centralizado
         function resetSession(newMode) {
             // Limpiar timers pendientes
@@ -2164,6 +2207,7 @@
             if(screenId === 'start-screen') {
                  headerSubtitle.textContent = 'Selecciona un Reto o Test Individual';
                  renderStartScreen();
+                 clearStorage();
             } else if (screenId === 'challenge-creation-screen') {
                  headerSubtitle.textContent = 'Configura tu Desafío';
             } else if (screenId === 'adventure-creation-screen') {
@@ -2364,6 +2408,7 @@
         // --- 7. FINALIZACIÓN DE JUEGOS ---
 
         function endChallenge(isVictory) {
+            clearStorage()
             State.quizCompleted = true;
             // Configurar botón de repetir en victoria
             if(isVictory){
@@ -2379,6 +2424,7 @@
         }
 
         function endAdventure() {
+            clearStorage()
             State.quizCompleted = true;
             adventureFinalScore.textContent = State.adventure.totalCorrect;
             
@@ -2393,6 +2439,7 @@
         }
         
         function finishExam() {
+            clearStorage()
             State.quizCompleted = true;
             
             const { correct, incorrect, unanswered } = State.exam;
@@ -2496,7 +2543,8 @@
                 optionsContainer.appendChild(skipButton);
             }
             
-            optionsContainer.scrollTop = 0;
+            optionsContainer.scrollTop = 0;    
+            saveStateToStorage();        
         }
 
         function showCorrectFeedback() {
@@ -2651,6 +2699,7 @@
         }
 
         function finishNormalQuiz() {
+            clearStorage()
             State.quizCompleted = true;
             showScreen('results-screen');
             
@@ -2679,7 +2728,12 @@
 
         window.onload = () => {
             document.getElementById('quiz-card').classList.add('relative');
-            showScreen('start-screen');
+            
+            // Si logramos restaurar, no hacemos nada más (ya estamos en el juego).
+            // Si NO hay sesión guardada, mostramos el menú.
+            if (!attemptRestoreSession()) {
+                showScreen('start-screen');
+            }
         }
 
     </script>
