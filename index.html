@@ -2818,5 +2818,20 @@
         }
 
     </script>
+
+    <script>
+    // SCRIPT DE LIMPIEZA DE PWA
+    // Este código elimina cualquier Service Worker previo para forzar
+    // el modo "Web Shortcut" simple (como Paco Tutor).
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for(let registration of registrations) {
+            registration.unregister().then(function(boolean) {
+            console.log('Service Worker previo eliminado:', boolean);
+            });
+        }
+        });
+    }
+    </script>
 </body>
 </html>
